@@ -6,9 +6,18 @@ import { supabase, getUserProfile } from '../services/supabase'
 interface User {
   id: string
   email: string
+  username?: string
   full_name?: string
   avatar_url?: string
   points: number
+  role: 'user' | 'admin' | 'company'
+  user_type: 'tester' | 'developer' | 'admin'
+  status: 'pending' | 'approved' | 'rejected' | 'suspended'
+  company?: string
+  experience?: string
+  interests?: string
+  approved_by?: string
+  approved_at?: string
   created_at: string
   updated_at: string
 }
@@ -17,7 +26,7 @@ interface AuthContextType {
   user: SupabaseUser | null
   userProfile: User | null
   loading: boolean
-  signUp: (email: string, password: string, fullName: string) => Promise<any>
+  signUp: (email: string, password: string, fullName: string, userType: 'tester' | 'developer' | 'admin', metadata?: { username?: string; company?: string; experience?: string; interests?: string }) => Promise<any>
   signIn: (email: string, password: string) => Promise<any>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -55,6 +64,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email: user.email || '',
           full_name: user.user_metadata?.full_name || '',
           points: 0,
+          role: 'user',
+          user_type: user.user_metadata?.user_type || 'tester',
+          status: 'pending',
+          company: user.user_metadata?.company,
+          experience: user.user_metadata?.experience,
+          interests: user.user_metadata?.interests,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -86,7 +101,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const {
         data: { subscription: authSubscription },
-      } = supabase.auth.onAuthStateChange(async (event, session) => {
+      } = supabase.auth.onAuthStateChange(async (_event, session) => {
         setUser(session?.user ?? null)
         if (session?.user) {
           await refreshProfile()
@@ -107,33 +122,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [])
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
+  const signUp = async (email: string, password: string, fullName: string, userType: 'tester' | 'developer' | 'admin', metadata?: { username?: string; company?: string; experience?: string; interests?: string }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          user_type: userType,
+          username: metadata?.username,
+          company: metadata?.company,
+          experience: metadata?.experience,
+          interests: metadata?.interests,
         },
-      })
-      return { data, error }
-    } catch (error) {
-      return { data: null, error: { message: 'Supabase not configured. Please set up your environment variables.' } }
-    }
+      },
+    })
+    return { data, error }
   }
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      return { data, error }
-    } catch (error) {
-      return { data: null, error: { message: 'Supabase not configured. Please set up your environment variables.' } }
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { data, error }
   }
 
   const signOut = async () => {

@@ -1,5 +1,6 @@
 import React from 'react'
 import NavBar from '../components/NavBar'
+import DatabaseStatus from '../components/DatabaseStatus'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -19,6 +20,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
         </div>
       </footer>
+      <DatabaseStatus />
     </div>
   )
 }

@@ -8,10 +8,18 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE public.users (
     id UUID REFERENCES auth.users(id) PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE, -- Optional username for login
     full_name TEXT,
     avatar_url TEXT,
     points INTEGER DEFAULT 0,
     role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin', 'company')),
+    user_type TEXT DEFAULT 'tester' CHECK (user_type IN ('tester', 'developer', 'admin')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'suspended')),
+    company TEXT, -- For developers
+    experience TEXT, -- For testers
+    interests TEXT, -- For testers
+    approved_by UUID REFERENCES auth.users(id), -- Admin who approved the user
+    approved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -137,7 +145,9 @@ CREATE POLICY "Users can view their own rewards" ON public.rewards
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = public
+AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
@@ -156,13 +166,20 @@ CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON public.feedback
 
 -- Function to automatically create user profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = public
+AS $$
 BEGIN
-    INSERT INTO public.users (id, email, full_name)
+    INSERT INTO public.users (id, email, username, full_name, user_type, company, experience, interests)
     VALUES (
         NEW.id,
         NEW.email,
-        NEW.raw_user_meta_data->>'full_name'
+        NEW.raw_user_meta_data->>'username',
+        NEW.raw_user_meta_data->>'full_name',
+        COALESCE(NEW.raw_user_meta_data->>'user_type', 'tester'),
+        NEW.raw_user_meta_data->>'company',
+        NEW.raw_user_meta_data->>'experience',
+        NEW.raw_user_meta_data->>'interests'
     );
     RETURN NEW;
 END;
@@ -175,17 +192,19 @@ CREATE TRIGGER on_auth_user_created
 
 -- Function to award points for feedback
 CREATE OR REPLACE FUNCTION public.award_feedback_points()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = public
+AS $$
 BEGIN
     -- Award 50 points for feedback submission
     INSERT INTO public.rewards (user_id, points, reason, reference_id, reference_type)
     VALUES (NEW.user_id, 50, 'Feedback submission', NEW.id, 'feedback');
-    
+
     -- Update user points
-    UPDATE public.users 
-    SET points = points + 50 
+    UPDATE public.users
+    SET points = points + 50
     WHERE id = NEW.user_id;
-    
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

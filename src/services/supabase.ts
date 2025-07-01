@@ -3,22 +3,28 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Use demo/placeholder values if environment variables are not set
-const defaultUrl = 'https://demo.supabase.co'
-const defaultKey = 'demo-key'
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Please check your .env file.')
+}
 
-const finalUrl = supabaseUrl && supabaseUrl !== 'your_supabase_project_url' ? supabaseUrl : defaultUrl
-const finalKey = supabaseAnonKey && supabaseAnonKey !== 'your_supabase_anon_key' ? supabaseAnonKey : defaultKey
-
-export const supabase = createClient(finalUrl, finalKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Database Types
 export interface User {
   id: string
   email: string
+  username?: string
   full_name?: string
   avatar_url?: string
   points: number
+  role: 'user' | 'admin' | 'company'
+  user_type: 'tester' | 'developer' | 'admin'
+  status: 'pending' | 'approved' | 'rejected' | 'suspended'
+  company?: string
+  experience?: string
+  interests?: string
+  approved_by?: string
+  approved_at?: string
   created_at: string
   updated_at: string
 }
@@ -59,13 +65,17 @@ export interface TestingOpportunity {
 }
 
 // Auth helpers
-export const signUp = async (email: string, password: string, fullName: string) => {
+export const signUp = async (email: string, password: string, fullName: string, userType: 'tester' | 'developer', metadata?: { company?: string; experience?: string; interests?: string }) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
         full_name: fullName,
+        user_type: userType,
+        company: metadata?.company,
+        experience: metadata?.experience,
+        interests: metadata?.interests,
       },
     },
   })

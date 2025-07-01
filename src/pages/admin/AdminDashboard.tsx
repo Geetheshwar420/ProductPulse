@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import MainLayout from '../../layouts/MainLayout'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { supabase } from '../../services/supabase'
@@ -8,6 +9,8 @@ interface AdminStats {
   totalProducts: number
   totalFeedback: number
   pendingProducts: number
+  pendingUsers: number
+  approvedUsers: number
 }
 
 const AdminDashboard: React.FC = () => {
@@ -15,7 +18,9 @@ const AdminDashboard: React.FC = () => {
     totalUsers: 0,
     totalProducts: 0,
     totalFeedback: 0,
-    pendingProducts: 0
+    pendingProducts: 0,
+    pendingUsers: 0,
+    approvedUsers: 0
   })
   const [loading, setLoading] = useState(true)
 
@@ -26,18 +31,22 @@ const AdminDashboard: React.FC = () => {
   const fetchAdminStats = async () => {
     try {
       // Fetch various statistics
-      const [usersResult, productsResult, feedbackResult, pendingResult] = await Promise.all([
+      const [usersResult, productsResult, feedbackResult, pendingProductsResult, pendingUsersResult, approvedUsersResult] = await Promise.all([
         supabase.from('users').select('id', { count: 'exact' }),
         supabase.from('products').select('id', { count: 'exact' }),
         supabase.from('feedback').select('id', { count: 'exact' }),
-        supabase.from('products').select('id', { count: 'exact' }).eq('status', 'pending')
+        supabase.from('products').select('id', { count: 'exact' }).eq('status', 'pending'),
+        supabase.from('users').select('id', { count: 'exact' }).eq('status', 'pending'),
+        supabase.from('users').select('id', { count: 'exact' }).eq('status', 'approved')
       ])
 
       setStats({
         totalUsers: usersResult.count || 0,
         totalProducts: productsResult.count || 0,
         totalFeedback: feedbackResult.count || 0,
-        pendingProducts: pendingResult.count || 0
+        pendingProducts: pendingProductsResult.count || 0,
+        pendingUsers: pendingUsersResult.count || 0,
+        approvedUsers: approvedUsersResult.count || 0
       })
     } catch (error) {
       console.error('Error fetching admin stats:', error)
@@ -68,7 +77,7 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
           <div className="card bg-blue-50 border-blue-200">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -132,16 +141,48 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <div className="card bg-yellow-50 border-yellow-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-yellow-600">Pending Users</p>
+                <p className="text-2xl font-bold text-yellow-900">{stats.pendingUsers}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-emerald-50 border-emerald-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-emerald-600">Approved Users</p>
+                <p className="text-2xl font-bold text-emerald-900">{stats.approvedUsers}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="card">
             <h3 className="text-lg font-heading font-semibold mb-4">User Management</h3>
-            <p className="text-gray-600 mb-4">Manage user accounts and permissions</p>
-            <button className="btn-primary w-full">
+            <p className="text-gray-600 mb-4">Approve and manage testers and developers</p>
+            <Link to="/admin/users" className="btn-primary w-full text-center block">
               Manage Users
-            </button>
+            </Link>
           </div>
 
           <div className="card">
