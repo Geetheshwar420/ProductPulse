@@ -12,8 +12,8 @@ CREATE TABLE public.users (
     full_name TEXT,
     avatar_url TEXT,
     points INTEGER DEFAULT 0,
-    role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin', 'company')),
-    user_type TEXT DEFAULT 'tester' CHECK (user_type IN ('tester', 'developer', 'admin')),
+    role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin', 'super_user', 'company')),
+    user_type TEXT DEFAULT 'tester' CHECK (user_type IN ('tester', 'developer', 'admin', 'super_user')),
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'suspended')),
     company TEXT, -- For developers
     experience TEXT, -- For testers
@@ -88,6 +88,26 @@ CREATE INDEX idx_testing_opportunities_user_id ON public.testing_opportunities(u
 CREATE INDEX idx_testing_opportunities_product_id ON public.testing_opportunities(product_id);
 CREATE INDEX idx_rewards_user_id ON public.rewards(user_id);
 
+-- Admin Actions Log table for super user monitoring
+CREATE TABLE public.admin_actions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    admin_id UUID REFERENCES auth.users(id) NOT NULL,
+    action_type TEXT NOT NULL, -- 'user_approval', 'user_rejection', 'user_suspension', 'admin_creation', etc.
+    target_user_id UUID REFERENCES auth.users(id),
+    target_email TEXT,
+    action_details JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Additional indexes
+CREATE INDEX idx_users_email ON public.users(email);
+CREATE INDEX idx_users_role ON public.users(role);
+CREATE INDEX idx_users_user_type ON public.users(user_type);
+CREATE INDEX idx_admin_actions_admin_id ON public.admin_actions(admin_id);
+CREATE INDEX idx_admin_actions_created_at ON public.admin_actions(created_at DESC);
+
 -- Row Level Security (RLS) Policies
 
 -- Enable RLS on all tables
@@ -96,50 +116,71 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.testing_opportunities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rewards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_actions ENABLE ROW LEVEL SECURITY;
 
 -- Users policies
 CREATE POLICY "Users can view their own profile" ON public.users
-    FOR SELECT USING (auth.uid() = id);
+    FOR SELECT USING ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Users can update their own profile" ON public.users
-    FOR UPDATE USING (auth.uid() = id);
+    FOR UPDATE USING ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Enable insert for authenticated users only" ON public.users
-    FOR INSERT WITH CHECK (auth.uid() = id);
+    FOR INSERT WITH CHECK ((SELECT auth.uid()) = id);
 
 -- Products policies
 CREATE POLICY "Anyone can view active products" ON public.products
-    FOR SELECT USING (status = 'active' OR auth.uid() = submitted_by);
+    FOR SELECT USING (status = 'active' OR (SELECT auth.uid()) = submitted_by);
 
 CREATE POLICY "Authenticated users can submit products" ON public.products
-    FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+    FOR INSERT WITH CHECK ((SELECT auth.role()) = 'authenticated');
 
 CREATE POLICY "Users can update their own products" ON public.products
-    FOR UPDATE USING (auth.uid() = submitted_by);
+    FOR UPDATE USING ((SELECT auth.uid()) = submitted_by);
 
 -- Testing opportunities policies
 CREATE POLICY "Users can view their own testing opportunities" ON public.testing_opportunities
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can apply for testing opportunities" ON public.testing_opportunities
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can update their own applications" ON public.testing_opportunities
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- Feedback policies
 CREATE POLICY "Anyone can view feedback" ON public.feedback
     FOR SELECT USING (true);
 
 CREATE POLICY "Users can submit feedback" ON public.feedback
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
 
 CREATE POLICY "Users can update their own feedback" ON public.feedback
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING ((SELECT auth.uid()) = user_id);
 
 -- Rewards policies
 CREATE POLICY "Users can view their own rewards" ON public.rewards
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING ((SELECT auth.uid()) = user_id);
+
+-- Admin Actions policies
+CREATE POLICY "Super users can view all admin actions" ON public.admin_actions
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.users
+            WHERE id = (SELECT auth.uid())
+            AND role = 'super_user'
+            AND user_type = 'super_user'
+        )
+    );
+
+CREATE POLICY "Admins and super users can insert admin actions" ON public.admin_actions
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.users
+            WHERE id = (SELECT auth.uid())
+            AND (role = 'admin' OR role = 'super_user')
+        )
+    );
 
 -- Functions and Triggers
 
@@ -206,6 +247,27 @@ BEGIN
     WHERE id = NEW.user_id;
 
     RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to award points manually (for various actions)
+CREATE OR REPLACE FUNCTION public.award_points(
+    user_id UUID,
+    points INTEGER,
+    reason TEXT DEFAULT 'Manual award'
+)
+RETURNS VOID
+SET search_path = public
+AS $$
+BEGIN
+    -- Insert reward record
+    INSERT INTO public.rewards (user_id, points, reason, reference_type)
+    VALUES (user_id, points, reason, 'manual');
+
+    -- Update user points
+    UPDATE public.users
+    SET points = points + award_points.points
+    WHERE id = award_points.user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

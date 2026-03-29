@@ -12,14 +12,15 @@
 -- Password: Admin123!
 -- Username: admin
 -- Role: admin
+-- User Type: admin
 
-UPDATE public.users 
-SET 
+UPDATE public.users
+SET
     role = 'admin',
+    user_type = 'admin',
     username = 'admin',
     status = 'approved',
-    user_type = 'tester',
-    full_name = 'Admin User',
+    full_name = 'System Administrator',
     updated_at = NOW()
 WHERE email = 'admin@productpulse.com';
 

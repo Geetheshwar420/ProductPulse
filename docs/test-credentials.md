@@ -8,19 +8,53 @@ All users can log in using either:
 - **Email address** (e.g., `admin@productpulse.com`)
 - **Username** (e.g., `admin`)
 
+## 👑 Super User Account (Highest Level)
+
+### Super User Administrator
+- **Email:** `superuser@productpulse.com`
+- **Username:** `superuser`
+- **Password:** `SuperUser123!`
+- **Role:** Super User
+- **User Type:** Super User
+- **Status:** Approved
+- **Access:**
+  - Create and manage admins
+  - Monitor all admin actions
+  - Access all user types for monitoring
+  - Full platform oversight
+  - All admin capabilities
+
+**Super User URLs:**
+- Login: `/super-admin/login`
+- Dashboard: `/super-admin/dashboard`
+
 ## 👨‍💼 Admin Accounts
 
 ### Primary Admin
-- **Email:** `admin@productpulse.com`
-- **Username:** `admin`
+- **Email:** `admin1@productpulse.com`
+- **Username:** `admin1`
 - **Password:** `Admin123!`
 - **Role:** Admin
-- **Status:** Approved
-- **Access:** 
-  - Full admin dashboard
+- **User Type:** Admin
+- **Status:** Approved (by Super User)
+- **Access:**
+  - Admin dashboard
   - User management and approval
   - System analytics
-  - All platform features
+  - Platform administration
+
+### Secondary Admin
+- **Email:** `admin2@productpulse.com`
+- **Username:** `admin2`
+- **Password:** `Admin123!`
+- **Role:** Admin
+- **User Type:** Admin
+- **Status:** Approved (by Super User)
+- **Access:**
+  - Admin dashboard
+  - User management and approval
+  - System analytics
+  - Platform administration
 
 **Admin URLs:**
 - Login: `/admin/login`

@@ -25,6 +25,8 @@ dist-ssr
 # Documentation and requirements (exclude from repo)
 doc/
 doc/*
+docs/
+docs/*
 
 # Environment variables (keep local)
 .env
@@ -43,3 +45,12 @@ setup-supabase.md
 *.simple.tsx
 *.test.backup
 *.temp.*
+.agent/*
+
+# Database files (contain user data / hashed passwords)
+*.db
+*.sqlite
+*.sqlite3
+
+# User uploads
+uploads/
